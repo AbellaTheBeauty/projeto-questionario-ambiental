@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
     // Envia o e-mail através do Resend
     await resend.emails.send({
-      from: 'EnvCheck <onboarding@resend.dev>',
+      from: 'Diagnóstico Ambiental <nao-responda@conformidade.eco.br>',
       to: email,
       subject: 'O seu acesso ao Diagnóstico Ambiental - EnvCheck',
       html: `
