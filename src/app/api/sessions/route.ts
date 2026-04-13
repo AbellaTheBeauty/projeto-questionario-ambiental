@@ -46,19 +46,19 @@ export async function POST(request: Request) {
 
     // Envia o e-mail através do Resend
     await resend.emails.send({
-      from: 'Diagnóstico Ambiental <nao-responda@conformidade.eco.br>',
+      from: 'Avaliação Ambiental <nao-responda@conformidade.eco.br>',
       to: email,
-      subject: 'O seu acesso ao Diagnóstico Ambiental - EnvCheck',
+      subject: 'O seu acesso à Avaliação de Conformidade Ambiental',
       html: `
         <div style="font-family: sans-serif; max-w: 600px; margin: 0 auto; color: #333;">
-          <h2 style="color: #047857;">Bem-vindo(a) ao EnvCheck, ${name}!</h2>
-          <p>O seu ambiente de diagnóstico ambiental está pronto e seguro.</p>
-          <p>Para iniciar o preenchimento, clique no botão abaixo. Por motivos de segurança e privacidade, <strong>este link irá expirar em 7 dias</strong>.</p>
+          <h2 style="color: #047857;">Olá, ${name}!</h2>
+          <p>O seu ambiente para a <strong>Avaliação de Conformidade Ambiental</strong> está pronto e seguro.</p>
+          <p>Para ler as instruções e iniciar o preenchimento, clique no botão abaixo. Por motivos de segurança, <strong>este link exclusivo irá expirar em 7 dias</strong>.</p>
           <a href="${magicLink}" style="display: inline-block; background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px;">
-            Aceder ao Questionário
+            Acessar o Questionário
           </a>
           <p style="margin-top: 30px; font-size: 12px; color: #666;">
-            Aviso legal: O relatório final será enviado exclusivamente para este e-mail. Os seus dados não serão retidos após a conclusão.
+            Aviso legal: O relatório final será enviado exclusivamente para este e-mail. Após a emissão, o formulário será bloqueado.
           </p>
         </div>
       `

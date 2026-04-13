@@ -11,44 +11,103 @@ interface QuestionnaireProps {
 export function Questionnaire({ questions, onComplete }: QuestionnaireProps) {
   const [currentQuestionId, setCurrentQuestionId] = useState(questions[0]?.id);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  
+  // NOVO: Histórico para o botão voltar (guarda os IDs das perguntas anteriores)
+  const [history, setHistory] = useState<string[]>([]);
+  
+  // NOVO: Estado para controlar a exibição da tela de revisão final
+  const [isReviewing, setIsReviewing] = useState(false);
 
   const currentQuestion = questions.find((q) => q.id === currentQuestionId);
 
   const handleAnswer = (answerText: string, fallbackNextId: string) => {
-    // Procura se o botão clicado tem uma rota específica nas "options"
     const specificOption = currentQuestion?.options?.find(
       (opt) => opt.text.toLowerCase() === answerText.toLowerCase()
     );
     
-    // Se tiver rota específica, usa ela. Se não, usa a rota padrão da pergunta.
     const nextId = specificOption?.nextId || fallbackNextId;
 
     const newAnswers = { ...answers, [currentQuestionId]: answerText };
     setAnswers(newAnswers);
 
     if (nextId === 'FIM') {
-      onComplete(newAnswers);
+      // Em vez de finalizar direto, ativa a tela de revisão
+      setIsReviewing(true);
     } else {
+      // Guarda a pergunta atual no histórico antes de ir para a próxima
+      setHistory([...history, currentQuestionId]);
       setCurrentQuestionId(nextId);
     }
   };
 
-  // REDE DE SEGURANÇA: Mostra exatamente qual pergunta está faltando!
+  // NOVO: Função para voltar atrás
+  const handleGoBack = () => {
+    if (history.length === 0) return; // Se não houver histórico, não faz nada
+    
+    // Tira o último ID do histórico e volta para ele
+    const newHistory = [...history];
+    const previousQuestionId = newHistory.pop();
+    
+    if (previousQuestionId) {
+      setHistory(newHistory);
+      setCurrentQuestionId(previousQuestionId);
+    }
+  };
+
+  // ============================================================================
+  // TELA DE REVISÃO FINAL (Intercepta o fim do questionário)
+  // ============================================================================
+  if (isReviewing) {
+    return (
+      <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 max-w-2xl mx-auto w-full animate-in fade-in zoom-in-95 duration-500 text-center">
+        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        
+        <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4">
+          Você concluiu o preenchimento do formulário de avaliação!
+        </h3>
+        
+        <p className="text-slate-600 dark:text-slate-300 mb-8 leading-relaxed text-left bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-100 dark:border-slate-700">
+          Deseja voltar para revisar alguma resposta ou deseja finalizar a avaliação e emitir o relatório?
+          <br /><br />
+          <strong>Atenção:</strong> Após finalizar, o relatório será gerado na tela e também será enviado para o endereço de e-mail informado no cadastramento inicial. Não será possível reemitir ou acessar o formulário novamente.
+          <br /><br />
+          Deseja finalizar agora?
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            onClick={() => setIsReviewing(false)} // Esconde a revisão e volta para a última pergunta
+            className="py-3 px-6 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex-1"
+          >
+            Voltar para revisar
+          </button>
+          <button
+            onClick={() => onComplete(answers)} // Agora sim, emite o relatório!
+            className="py-3 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg hover:shadow-emerald-500/20 transition-all flex-1"
+          >
+            Sim, finalizar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // REDE DE SEGURANÇA (Se a pergunta falhar)
   if (!currentQuestion) {
     return (
       <div className="bg-red-950/30 p-8 rounded-2xl border border-red-900 text-center max-w-2xl mx-auto mt-8">
         <h3 className="text-xl font-bold text-red-500 mb-2">⚠️ Ops! Caminho Quebrado</h3>
         <p className="text-slate-300">
-          O sistema tentou ir para a pergunta <strong className="text-white text-lg px-2 py-1 bg-red-900 rounded mx-1">"{currentQuestionId}"</strong>, mas ela não foi encontrada.
-        </p>
-        <p className="text-sm text-slate-400 mt-4">
-          Provavelmente essa pergunta foi apagada por acidente no arquivo <code>questions.json</code> ou o ID está digitado diferente.
+          O sistema tentou ir para a pergunta <strong className="text-white text-lg px-2 py-1 bg-red-900 rounded mx-1">"{currentQuestionId}"</strong>, mas ela não foi encontrada no ficheiro JSON.
         </p>
       </div>
     );
   }
 
-  // Detecta se é uma pergunta de Sim/Não para aplicar o layout lado a lado
   const isYesNoVisual = 
     currentQuestion.responseType === 'Sim/Não' || 
     (currentQuestion.options?.length === 2 && 
@@ -58,10 +117,21 @@ export function Questionnaire({ questions, onComplete }: QuestionnaireProps) {
   return (
     <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 max-w-2xl mx-auto w-full transition-all duration-300">
       
-      <div className="mb-6">
+      {/* HEADER DO CARD: Mostra o Tópico e o Botão Voltar */}
+      <div className="mb-6 flex items-center justify-between">
         <span className="inline-block bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
           {currentQuestion.topic}
         </span>
+        
+        {/* Só mostra o botão Voltar se o utilizador já respondeu a pelo menos uma pergunta */}
+        {history.length > 0 && (
+          <button 
+            onClick={handleGoBack}
+            className="text-sm font-medium text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <span>←</span> Voltar
+          </button>
+        )}
       </div>
 
       <h3 className="text-2xl font-semibold text-slate-800 dark:text-slate-100 mb-8 leading-snug">

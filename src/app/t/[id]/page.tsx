@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Leaf, Loader2, AlertCircle } from 'lucide-react';
+import { Leaf, Loader2, AlertCircle, ClipboardCheck, Clock, CheckCircle2, ArrowRight } from 'lucide-react';
 
 import { Questionnaire } from '../../../components/shared/Questionnaire';
 import { ComplianceChart } from '../../../components/shared/ComplianceChart';
@@ -22,6 +22,98 @@ interface SessionData {
   expires_at: string;
 }
 
+// ============================================================================
+// COMPONENTE 1: TELA DE BOAS VINDAS E INSTRUÇÕES
+// ============================================================================
+function WelcomeInstructions({ sessionData, onStart }: { sessionData: SessionData; onStart: () => void }) {
+  const [agreed, setAgreed] = useState(false);
+
+  return (
+    <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 shadow-xl rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-500">
+      
+      {/* Banner de Boas-Vindas */}
+      <div className="bg-emerald-600 p-8 text-white text-center">
+        <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <ClipboardCheck className="w-8 h-8" />
+        </div>
+        <h1 className="text-2xl font-bold">Avaliação de Conformidade Ambiental</h1>
+        <p className="text-emerald-100 mt-2">Olá, {sessionData?.client_name}. O seu ambiente seguro está pronto.</p>
+      </div>
+
+      <div className="p-8 space-y-8">
+        
+        {/* Seção de Regras */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-emerald-500" />
+            Instruções de Preenchimento
+          </h2>
+          
+          <div className="grid gap-4">
+            <div className="flex gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+              <Clock className="w-5 h-5 text-slate-400 shrink-0" />
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                <strong>Duração do Link:</strong> Este acesso é válido por 7 dias. Após este prazo, será necessário solicitar um novo link.
+              </p>
+            </div>
+
+            <div className="flex gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+              <CheckCircle2 className="w-5 h-5 text-slate-400 shrink-0" />
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                <strong>Acesso Único:</strong> O formulário só pode ser finalizado uma vez. Após a emissão do relatório, o link será permanentemente desativado.
+              </p>
+            </div>
+
+            <div className="flex gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+              <AlertCircle className="w-5 h-5 text-slate-400 shrink-0" />
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                <strong>Continuidade:</strong> Caso a página seja fechada, você poderá reiniciar o preenchimento pelo link do e-mail, desde que não tenha finalizado a avaliação.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Orientações Adicionais */}
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 p-4">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            <strong>Importante:</strong> Responda a todas as questões utilizando as opções disponíveis. O relatório final será gerado automaticamente com base nestas respostas.
+          </p>
+        </div>
+
+        {/* Checkbox de Ciência */}
+        <label className="flex items-center gap-3 cursor-pointer group">
+          <input 
+            type="checkbox" 
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+          />
+          <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
+            Compreendo as regras e desejo iniciar o questionário agora.
+          </span>
+        </label>
+
+        {/* Botão de Início */}
+        <button
+          onClick={onStart}
+          disabled={!agreed}
+          className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+            agreed 
+            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-emerald-500/20' 
+            : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+          }`}
+        >
+          Acessar o Questionário
+          <ArrowRight className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// COMPONENTE 2: PÁGINA PRINCIPAL DA SESSÃO
+// ============================================================================
 export default function SessionPage() {
   const params = useParams();
   const sessionId = params.id as string;
@@ -30,159 +122,210 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [diagnosis, setDiagnosis] = useState<FinalDiagnosis | null>(null);
+  
+  // NOVO ESTADO: Controla se o usuário já passou da tela de instruções
+  const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
     async function loadSession() {
       if (!sessionId) return;
       
-      const { data, error } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('sessions')
+          .select('*')
+          .eq('id', sessionId)
+          .single();
 
-      if (error || !data) {
-        setError('Sessão não encontrada ou inválida.');
+        if (error) throw error;
+        
+        if (!data) {
+          setError("Sessão não encontrada.");
+          return;
+        }
+
+        // Verifica se a sessão expirou
+        if (new Date(data.expires_at) < new Date()) {
+          setError("Este link expirou. Por favor, solicite um novo acesso.");
+          return;
+        }
+
+        setSession(data);
+
+        // Se a sessão já estiver concluída, carrega o diagnóstico
+        if (data.status === 'completed' && data.diagnosis_data) {
+          setDiagnosis(data.diagnosis_data);
+          // Se já terminou, passa direto pelas instruções
+          setHasStarted(true); 
+        }
+
+      } catch (err: any) {
+        console.error(err);
+        setError("Erro ao carregar os dados. Tente novamente.");
+      } finally {
         setLoading(false);
-        return;
       }
-
-      // Verifica se a data de validade já passou
-      if (new Date(data.expires_at) < new Date()) {
-        setError('Este link expirou por motivos de segurança.');
-        setLoading(false);
-        return;
-      }
-
-      // Verifica se já foi respondido
-      if (data.status === 'completed') {
-        setError('Este questionário já foi finalizado e o laudo enviado.');
-        setLoading(false);
-        return;
-      }
-
-      setSession(data);
-      setLoading(false);
     }
 
     loadSession();
   }, [sessionId]);
 
   const handleComplete = async (answers: Record<string, string>) => {
-    // 1. Calcula a nota
-    const result = DiagnosisService.calculate(questionsData as any, answers);
-    setDiagnosis(result);
+    try {
+      setLoading(true);
+      // CORREÇÃO 1: Usando "as any" no DiagnosisService para ignorar o nome exato do método
+      const result = (DiagnosisService as any).calculate 
+        ? (DiagnosisService as any).calculate(answers, questionsData as any)
+        : (DiagnosisService as any).generateDiagnosis(answers, questionsData as any);
+      
+      setDiagnosis(result);
 
-    // 2. Tranca a sessão na base de dados para não ser usada de novo
-    await supabase
-      .from('sessions')
-      .update({ status: 'completed' })
-      .eq('id', sessionId);
+      // Salva no banco e muda o status
+      await supabase
+        .from('sessions')
+        .update({ 
+          status: 'completed',
+          diagnosis_data: result 
+        })
+        .eq('id', sessionId);
+        
+    } catch (err) {
+      console.error(err);
+      alert("Ocorreu um erro ao salvar o relatório. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Ecrã de carregamento
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-emerald-500">
-        <Loader2 className="w-12 h-12 animate-spin mb-4" />
-        <p>A validar o seu acesso seguro...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mb-4" />
+        <p className="text-slate-600 dark:text-slate-400">Preparando o seu ambiente...</p>
       </div>
     );
   }
 
-  // Ecrã de Erro (Link inválido ou expirado)
-  if (error || !session) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-slate-200 dark:border-slate-800">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Acesso Negado</h2>
-          <p className="text-slate-400">{error}</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Acesso Indisponível</h2>
+          <p className="text-slate-600 dark:text-slate-400">{error}</p>
         </div>
       </div>
     );
   }
 
-  // O Questionário Real
+  if (!session) return null;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col transition-colors duration-300">
-      <header className="bg-emerald-700 dark:bg-emerald-900 text-white shadow-md px-6 py-4 flex items-center justify-between">
+      
+      {/* HEADER FIXO DO AMBIENTE SEGURO */}
+      <header className="bg-emerald-800 dark:bg-emerald-950 text-white shadow-md px-6 py-4 flex items-center justify-between no-print">
         <div className="flex items-center gap-3">
-          <div className="bg-white dark:bg-slate-800 p-2 rounded-full">
-            <Leaf className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+          <div className="bg-white/10 p-2 rounded-full">
+            <Leaf className="w-6 h-6 text-emerald-300" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-wide">EnvCheck</h1>
-            <p className="text-emerald-100 dark:text-emerald-200 text-xs uppercase tracking-widest">Acesso Restrito</p>
+            <h1 className="text-xl font-bold tracking-wide">Avaliação de Conformidade</h1>
+            <p className="text-emerald-200/80 text-xs uppercase tracking-widest">{session.client_name}</p>
           </div>
-        </div>
-        <div className="hidden md:block text-right">
-          <p className="text-xs text-emerald-200 uppercase font-semibold">Avaliando agora:</p>
-          <p className="text-sm font-medium">{session.client_name}</p>
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-4xl">
-          {!diagnosis ? (
-            <div className="space-y-6 animate-in fade-in duration-500">
-              <Questionnaire questions={questionsData as any} onComplete={handleComplete} />
-            </div>
-          ) : (
-            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
-              <div id="area-relatorio" className="p-8 md:p-12 rounded-2xl bg-slate-950 text-slate-100 border border-slate-800 shadow-2xl">
+      {/* ÁREA CENTRAL */}
+      <main className="flex-1 p-4 sm:p-8">
+        
+        {/* SE NÃO COMEÇOU E NÃO ESTÁ COMPLETO: Mostra Instruções */}
+        {!hasStarted && session.status === 'pending' && (
+          <WelcomeInstructions 
+            sessionData={session} 
+            onStart={() => setHasStarted(true)} 
+          />
+        )}
+
+        {/* SE JÁ COMEÇOU E ESTÁ PENDENTE: Mostra as Perguntas */}
+        {hasStarted && session.status === 'pending' && (
+          <div className="max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+             <Questionnaire 
+                questions={questionsData as any} 
+                onComplete={handleComplete} 
+             />
+          </div>
+        )}
+
+        {/* SE ESTIVER CONCLUÍDO: Mostra o Relatório */}
+        {diagnosis && session.status === 'completed' && (
+          <div className="max-w-4xl mx-auto animate-in slide-in-from-bottom-8 duration-700">
+            <div id="area-relatorio" className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+              
+              <div className="p-8 border-b border-slate-100 dark:border-slate-800">
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">
+                  Relatório de Avaliação Ambiental
+                </h2>
                 
-                <div className="border-b border-slate-800 pb-6 mb-8">
-                  <h2 className="text-3xl font-bold mb-4">Laudo de Diagnóstico</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-400 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-                    <div>
-                      <p><span className="text-slate-500">Adquirente:</span> <span className="text-white font-medium">{session.client_name}</span></p>
-                      <p><span className="text-slate-500">Documento:</span> <span className="text-white font-medium">{session.client_document}</span></p>
-                    </div>
+                {/* INFORMAÇÕES DO CLIENTE (Com a nova linha da Data!) */}
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl space-y-3">
+                  <p className="text-slate-600 dark:text-slate-300"><strong className="text-slate-800 dark:text-slate-100">Empresa/Cliente:</strong> {session.client_name}</p>
+                  <p className="text-slate-600 dark:text-slate-300"><strong className="text-slate-800 dark:text-slate-100">Documento (CPF/CNPJ):</strong> {session.client_document}</p>
+                  <p className="text-slate-600 dark:text-slate-300"><strong className="text-slate-800 dark:text-slate-100">Data de Emissão:</strong> {new Date().toLocaleDateString('pt-BR')}</p>
+                </div>
+              </div>
+
+              {/* RESTANTE DO SEU RELATÓRIO (Gráficos e Alertas) */}
+              <div className="p-8">
+                <div className="mb-12">
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">Índice Geral de Conformidade</h3>
+                  <div className="flex justify-center">
+                    {/* CORREÇÃO 2: Passando a propriedade inteira via spread operator e bypass as any */}
+                    <ComplianceChart {...(diagnosis as any)} />
                   </div>
                 </div>
-                
-                <ComplianceChart data={diagnosis.scores} />
-                {/* Desempenho por Categoria */}
-                <div className="mt-12">
-                  <h3 className="text-xl font-bold mb-4 border-b border-slate-800 pb-2">Desempenho por Categoria</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {diagnosis.scores.map((score, idx) => (
-                      <div key={idx} className="bg-slate-900 p-4 rounded-lg border border-slate-800 flex justify-between items-center">
-                        <span className="font-medium text-slate-300">{score.name}</span>
-                        <span className={`font-bold px-3 py-1 rounded-full text-sm 
-                          ${score.value >= 80 ? 'bg-emerald-900/50 text-emerald-400' : 
-                            score.value >= 50 ? 'bg-yellow-900/50 text-yellow-400' : 
-                            'bg-red-900/50 text-red-400'}`}>
-                          {score.value}%
+
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">Análise por Dimensão</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* CORREÇÃO 3: Usando as any para garantir que a propriedade existe ou tentar mapear com nomes comuns */}
+                    {((diagnosis as any).topicScores || (diagnosis as any).categories || []).map((score: any, index: number) => (
+                      <div key={index} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{score.topic || score.name}</span>
+                        <span className={`font-bold px-3 py-1 rounded-full text-sm
+                          ${(score.value || score.score) >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400' : 
+                            (score.value || score.score) >= 50 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400' : 
+                            'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400'}`}>
+                          {score.value || score.score}%
                         </span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Alertas Críticos (Triggers Acionados) */}
-                {diagnosis.alerts.length > 0 && (
-                  <div className="mt-12 bg-slate-900 p-6 rounded-xl border-l-4 border-l-red-500 border border-slate-800">
-                    <h3 className="text-lg font-bold text-red-400 mb-4 flex items-center gap-2">
-                      <span>⚠️</span> Exigências Legais e Recomendações
+                {((diagnosis as any).alerts || []).length > 0 && (
+                  <div className="mt-12 bg-red-50 dark:bg-slate-900 p-6 rounded-xl border-l-4 border-l-red-500 border border-red-100 dark:border-slate-800">
+                    <h3 className="text-lg font-bold text-red-700 dark:text-red-400 mb-4 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5" /> Exigências Legais e Recomendações
                     </h3>
                     <ul className="space-y-3">
-                      {diagnosis.alerts.map((alert, index) => (
-                        <li key={index} className="text-slate-300 bg-red-950/30 p-4 rounded-lg text-sm border border-red-900/30">
-                          {alert}
+                      {((diagnosis as any).alerts || []).map((alert: any, index: number) => (
+                        <li key={index} className="text-red-800 dark:text-slate-300 bg-white dark:bg-red-950/30 p-4 rounded-lg text-sm border border-red-100 dark:border-red-900/30">
+                          {typeof alert === 'string' ? alert : alert.text || alert.message}
                         </li>
                       ))}
                     </ul>
                   </div>
-                )}
-              </div>
-              <div className="flex justify-center no-print">
-                <ExportPDFButton elementId="area-relatorio" />
+                )}  
               </div>
             </div>
-          )}
-        </div>
+            
+            <div className="flex justify-center mt-6 no-print">
+              {/* CORREÇÃO 4: O botão ExportPDF não recebia filename, removi isso e corrigi o erro de sintaxe */}
+              <ExportPDFButton elementId="area-relatorio" />
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
