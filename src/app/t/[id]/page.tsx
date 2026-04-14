@@ -175,8 +175,8 @@ export default function SessionPage() {
       setLoading(true);
       // CORREÇÃO 1: Usando "as any" no DiagnosisService para ignorar o nome exato do método
       const result = (DiagnosisService as any).calculate 
-        ? (DiagnosisService as any).calculate(answers, questionsData as any)
-        : (DiagnosisService as any).generateDiagnosis(answers, questionsData as any);
+        ? (DiagnosisService as any).calculate(questionsData as any, answers)
+        : (DiagnosisService as any).generateDiagnosis(questionsData as any, answers);
       
       setDiagnosis(result);
 
