@@ -180,7 +180,7 @@ export default function SessionPage() {
       
       setDiagnosis(result);
 
-      // Salva no banco e muda o status
+     // Salva no banco e muda o status
       await supabase
         .from('sessions')
         .update({ 
@@ -188,6 +188,10 @@ export default function SessionPage() {
           diagnosis_data: result 
         })
         .eq('id', sessionId);
+        
+      // A CORREÇÃO: Avisa a tela que acabou!
+      setSession(prev => prev ? { ...prev, status: 'completed' } : null);
+        
         
     } catch (err) {
       console.error(err);
