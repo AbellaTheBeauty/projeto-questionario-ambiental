@@ -285,7 +285,7 @@ export default function SessionPage() {
                   <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">Índice Geral de Conformidade</h3>
                   <div className="flex justify-center">
                     {/* CORREÇÃO 2: Passando a propriedade inteira via spread operator e bypass as any */}
-                    <ComplianceChart {...(diagnosis as any)} />
+                    <ComplianceChart data={(diagnosis as any).scores} />
                   </div>
                 </div>
 
